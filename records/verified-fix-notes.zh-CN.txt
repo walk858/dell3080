@@ -1,0 +1,94 @@
+同配置机器固定修复方案（声卡 + Wi-Fi，已验证）
+
+适用机器：Dell OptiPlex 3080 / 同配置 ALC256 机器
+系统：macOS 26 / Darwin 25 系列
+状态：已验证可用。当前机器声音正常，Wi-Fi 可以出现并连接。
+
+一、声卡最终结论
+
+已验证结果：
+- 前置音频正常。
+- 后置 Line Out 正常。
+- 不再需要继续尝试 layout 21 / 33 / alcverbs。
+
+核心原因：
+1. macOS 26 缺少/移除了 AppleHDA，需要补 AppleHDA.kext。
+2. Dell 3080 声卡需要 HPET / RTC / TIMR IRQ 修复，否则 AppleHDA/AppleALC 可能加载但音频设备挂不起来。
+3. ALC256 后置 Line Out 需要合适 layout，layout 21 前置可用但后置不完整；layout 67 已验证前后都有声音。
+
+固定配置，下一台完全照抄：
+1. AppleHDA.kext 已安装到系统。
+2. EFI/OC/ACPI/SSDT-HPET_RTC_TIMR-FIX.aml 必须存在并在 config.plist 的 ACPI -> Add 中启用。
+3. DeviceProperties -> Add -> PciRoot(0x0)/Pci(0x1F,0x3) 使用 layout-id = 67。
+4. boot-args 不要再写 alcid=21 / alcid=33 / alcverbs=1。
+5. csr-active-config = 03080000，保持给 AppleHDA 修复使用。
+
+当前 config.plist 中的声卡关键值：
+- ACPI -> Add 启用 SSDT-HPET_RTC_TIMR-FIX.aml。
+- DeviceProperties -> Add -> PciRoot(0x0)/Pci(0x1F,0x3) -> layout-id = 67。
+- Kernel -> Add 启用 AppleALC.kext。
+- NVRAM -> boot-args 中没有 alcid 和 alcverbs。
+
+二、Wi-Fi 最终结论
+
+已验证结果：
+- Wi-Fi 图标/列表能出现。
+- 能扫描并连接网络。
+- 最终不采用禁用 AirportBrcmFixup 的方案。
+- 最终不保留 brcmfx-driver=2 和 brcmfx-delay=9000 这类试错参数。
+
+核心原因：
+1. Broadcom Wi-Fi 在 macOS 26 / Darwin 25 下需要 Legacy Wi-Fi 组件。
+2. IOSkywalkFamily.kext、IO80211FamilyLegacy.kext、AirPortBrcmNIC.kext 必须一起启用。
+3. AirportBrcmFixup.kext 需要启用，并配合 brcmfxbeta 允许新系统加载。
+4. 地区参数使用 brcmfx-country=#a，避免国家/地区限制导致扫描或连接异常。
+5. FakePCIID.kext 保留启用，当前最终配置验证可用，不再删它。
+
+固定配置，下一台完全照抄：
+1. EFI/OC/Kexts 中保留并启用：
+   - Lilu.kext
+   - AirportBrcmFixup.kext
+   - IOSkywalkFamily.kext
+   - IO80211FamilyLegacy.kext
+   - IO80211FamilyLegacy.kext/Contents/PlugIns/AirPortBrcmNIC.kext
+   - FakePCIID.kext
+2. config.plist -> Kernel -> Add 中，AirportBrcmFixup.kext 排在 Lilu.kext 后面，且 Enabled = true。
+3. config.plist -> Kernel -> Add 中，IOSkywalkFamily.kext、IO80211FamilyLegacy.kext、AirPortBrcmNIC.kext 都 Enabled = true。
+4. config.plist -> NVRAM -> Add -> 7C436110-AB2A-4BBB-A880-FE41995C9F82 -> boot-args 保留：
+   brcmfx-country=#a brcmfxbeta
+5. 不要再加入：
+   - brcmfx-driver=2
+   - brcmfx-delay=9000
+   - brcmfx-aspm
+6. 如果复制到下一台后 Wi-Fi 列表不刷新，优先清网络偏好缓存并重启，不要先改 kext 或 boot-args。
+
+三、下一台同配置机器操作顺序
+
+1. 先复制当前已验证 config.plist。
+2. 确认 EFI/OC/ACPI 有 SSDT-HPET_RTC_TIMR-FIX.aml。
+3. 确认 EFI/OC/Kexts 有 AppleALC.kext、AirportBrcmFixup.kext、IOSkywalkFamily.kext、IO80211FamilyLegacy.kext、FakePCIID.kext。
+4. 确认系统侧 AppleHDA.kext 已按本机同样方式补好。
+5. 重启后先测声音：系统设置 -> 声音 -> 输出，分别测试前置耳机孔和后置 Line Out。
+6. 再测 Wi-Fi：确认 Wi-Fi 是否出现、是否能扫描到网络、是否能连接。
+7. 如果声音正常、Wi-Fi 能连接，就停止调试，不再继续改 layout、alcid、brcmfx-driver 或 delay 参数。
+
+四、已验证关键文件
+
+- /Users/galaxy/Documents/黑苹果声卡补丁/config.plist
+- /Users/galaxy/Documents/黑苹果声卡补丁/SSDT-HPET_RTC_TIMR-FIX.aml
+
+五、不要再改的内容
+
+- AppleALC.kext
+- AppleHDA.kext
+- HDEF layout-id
+- SSDT-HPET_RTC_TIMR-FIX.aml
+- 与 alcid / alcverbs 相关启动参数
+- AirportBrcmFixup.kext
+- IOSkywalkFamily.kext
+- IO80211FamilyLegacy.kext
+- AirPortBrcmNIC.kext
+- boot-args 里的 brcmfx-country=#a brcmfxbeta
+
+最终一句话：
+下一台完全一样配置的电脑，直接用当前 config.plist + SSDT-HPET_RTC_TIMR-FIX.aml，并确保系统 AppleHDA 与 Wi-Fi Legacy kext 齐全；声卡固定 layout-id 67，Wi-Fi 固定 AirportBrcmFixup + brcmfx-country=#a + brcmfxbeta。
