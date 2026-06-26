@@ -29,7 +29,7 @@ records/verified-fix-notes.zh-CN.txt
 ```
 
 - `SSDT-HPET_RTC_TIMR-FIX.aml`：HPET / RTC / TIMR IRQ 修复补丁。
-- `config.sample.plist`：公开版 OpenCore 配置样例，已经移除个人 SMBIOS 信息。
+- `config.sample.plist`：OpenCore 合并参考片段，不是完整可启动配置。
 - `docs/INSTALL.zh-CN.md`：安装和核对步骤。
 - `records/verified-fix-notes.zh-CN.txt`：实机验证记录，保留完整排查结论。
 
@@ -82,7 +82,7 @@ brcmfx-aspm
 
 ## 重要提醒
 
-- `config.sample.plist` 是公开样例，不建议直接覆盖自己的完整配置。
+- `config.sample.plist` 是合并参考片段，不要直接覆盖自己的完整配置。
 - 请务必生成自己的 SMBIOS 信息，不要使用别人的序列号、UUID、MLB。
 - 本项目不包含 AppleHDA.kext、AppleALC.kext、Lilu.kext 等 kext 文件。请从合法来源获取。
 - 黑苹果配置与 BIOS、硬件批次、OpenCore 版本有关。使用前请备份 EFI，方便回退。
